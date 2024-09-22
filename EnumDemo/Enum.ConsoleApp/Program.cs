@@ -1,15 +1,8 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 
+Console.WriteLine(Enumerable.Select(source, x => x*2).Sum());
+Console.WriteLine(Select(source, x => x*2).Sum());
 
-//Enumerable.Select<int, int>(null, x => x * 2);
-
-
-Console.WriteLine(0);
-IEnumerable<int> e = Select<int, int>(null, x => x * 2);
-Console.WriteLine(1);
-IEnumerator<int> enumerator = e.GetEnumerator();
-Console.WriteLine(2);
-enumerator.MoveNext();
 
 static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
 {
