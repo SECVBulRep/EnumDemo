@@ -1,19 +1,17 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-Console.WriteLine("Hello, World!");
-IEnumerable<Person> people = new List<Person>
-{
-    new() { Name = "John" }, new() { Name = "Jane" }
-};
+IEnumerable<int> source = Enumerable.Range(1, 10);
 
-var names = people.Select(x => x.Name);
-
-internal class Person
+foreach (var number in Select(source, x => x * 2))
 {
-    public string Name { get; set; }
+    Console.WriteLine(number);
 }
 
 
-static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source)
+static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
 {
+    foreach (var i in source)
+    {
+        yield return selector(i);
+    }
 }
