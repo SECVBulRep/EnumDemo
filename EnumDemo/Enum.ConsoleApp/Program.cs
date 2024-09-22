@@ -2,8 +2,11 @@
 
 Console.WriteLine("Hello, World!");
 
-foreach (var i in GetValues())
+IEnumerable<int> e = GetValues();
+using IEnumerator<int> enumerator = e.GetEnumerator();
+while (enumerator.MoveNext())
 {
+    int i = enumerator.Current;
     Console.WriteLine(i);
 }
 
