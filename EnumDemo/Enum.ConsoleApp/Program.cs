@@ -4,6 +4,7 @@ Console.WriteLine("Hello, World!");
 
 IEnumerable<int> e = GetValues();
 using IEnumerator<int> enumerator = e.GetEnumerator();
+Console.WriteLine(enumerator);
 while (enumerator.MoveNext())
 {
     int i = enumerator.Current;
