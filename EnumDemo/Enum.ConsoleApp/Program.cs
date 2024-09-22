@@ -2,7 +2,14 @@
 
 Console.WriteLine("Hello, World!");
 
+foreach (var i in GetValues())
+{
+    Console.WriteLine(i);
+}
+
 static IEnumerable<int> GetValues()
 {
-    return new List<int>() { 1, 2, 3 };
+    yield return 1;
+    yield return 2;
+    yield return 3;
 }
