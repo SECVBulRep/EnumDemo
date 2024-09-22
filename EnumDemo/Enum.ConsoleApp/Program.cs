@@ -13,11 +13,18 @@ enumerator.MoveNext();
 
 static IEnumerable<TResult> Select<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
 {
+    //Этот метод уже не итератором
     ArgumentNullException.ThrowIfNull(source);
     ArgumentNullException.ThrowIfNull(selector);
+
+    return Impl(source, selector);
     
-    foreach (var i in source)
+    //а вот этот уже итератор
+    static IEnumerable<TResult> Impl<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
     {
-        yield return selector(i);
+        foreach (var i in source)
+        {
+            yield return selector(i);
+        }
     }
 }
