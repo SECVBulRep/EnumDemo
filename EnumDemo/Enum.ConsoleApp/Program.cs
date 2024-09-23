@@ -4,21 +4,21 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 
 
-//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
-IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+//IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 
 
-Console.WriteLine(Test.SelectCompiler(source,i=>i));
-Console.WriteLine(Test.SelectManual(source,i=>i));
-Console.WriteLine(Enumerable.Select(source,i=>i));
-
-Console.WriteLine(Enumerable.Select(new List<int>(),i=>i));
-Console.WriteLine(Enumerable.Select(new Queue<int>(),i=>i));
-Console.WriteLine(Enumerable.Select(Enumerable.Range(1,1000),i=>i));
-
-
-Console.WriteLine(source.Select(i=>i%2).Select(i=>i));
-Console.WriteLine(source.Select(i=>i%2).Where(x=>x>1).Select(i=>i));
+// Console.WriteLine(Test.SelectCompiler(source, i => i));
+// Console.WriteLine(Test.SelectManual(source, i => i));
+// Console.WriteLine(Enumerable.Select(source, i => i));
+//
+// Console.WriteLine(Enumerable.Select(new List<int>(), i => i));
+// Console.WriteLine(Enumerable.Select(new Queue<int>(), i => i));
+// Console.WriteLine(Enumerable.Select(Enumerable.Range(1, 1000), i => i));
+//
+//
+// Console.WriteLine(source.Select(i => i % 2).Select(i => i));
+// Console.WriteLine(source.Select(i => i % 2).Where(x => x > 1).Select(i => i));
 
 // покажи сайта https://source.dot.net/  и там Iterator Linq
 
@@ -95,6 +95,12 @@ public class Test
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
+        if (source is TSource[] sourceArray)
+        {
+            return ArrayImpl(sourceArray, selector);
+        }
+
+
         return Impl(source, selector);
 
         //а вот этот уже итератор
@@ -102,6 +108,34 @@ public class Test
         {
             foreach (var i in source) yield return selector(i);
         }
+
+        static IEnumerable<TResult> ArrayImpl<TSource, TResult>(TSource[] source, Func<TSource, TResult> selector)
+        {
+            //foreach (var i in source) yield return selector(i);
+            for (int i = 0; i < source.Length; i++)
+            {
+                yield return selector(source[i]);
+            }
+        }
+
+
+        /*
+         * вставь  в sharplab и покажи разницу
+         *public class C<TSource,TResult>
+{
+    static IEnumerable<TResult> Impl<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
+        {
+            foreach (var i in source) yield return selector(i);
+        }
+
+        static IEnumerable<TResult> ArrayImpl<TSource, TResult>(TSource[] source, Func<TSource, TResult> selector)
+        {
+            foreach (var i in source) yield return selector(i);
+        }
+}
+         *
+         *
+         */
     }
 
     public static IEnumerable<TResult> SelectManual<TSource, TResult>(IEnumerable<TSource> source,
@@ -123,7 +157,7 @@ public class Test
         private IEnumerator<TSource> _enumerator;
         private int _state = 0;
         private int _threadId = Environment.CurrentManagedThreadId;
-        
+
 
         public SelectManualEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
         {
@@ -137,7 +171,8 @@ public class Test
             //  и обоих может быть  state = 1.
             // sпервое решение такое
             //if(Interlocked.CompareExchange(ref _state,1,0)==0)
-            if (_threadId==Environment.CurrentManagedThreadId && _state == 0) // подобную проверку генерит сам компилятор
+            if (_threadId == Environment.CurrentManagedThreadId &&
+                _state == 0) // подобную проверку генерит сам компилятор
             {
                 _state = 1;
                 return this;
