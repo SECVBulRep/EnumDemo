@@ -4,7 +4,26 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 
 
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+
+
+ IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+ Console.WriteLine(source.Select(x => x * 2).Sum());
+ Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
+ Console.WriteLine(Test.SelectManual(source, x => x * 2).Sum());
+
+// не реалзивали Reset %)
+ var m = Test.SelectManual(source, x => x * 2);
+
+Console.WriteLine(m.Sum());
+Console.WriteLine(m.Sum());
+
+
+m = Test.SelectCompiler(source, x => x * 2);
+
+Console.WriteLine(m.Sum());
+Console.WriteLine(m.Sum());
+
 
 
 [MemoryDiagnoser]
@@ -53,13 +72,9 @@ public class Test
 
         return sum;
     }
-    
-    
-// Console.WriteLine(source.Select(x => x * 2).Sum());
-// Console.WriteLine(SelectCompiler(source, x => x * 2).Sum());
-// Console.WriteLine(SelectManual(source, x => x * 2).Sum());
 
-    static IEnumerable<TResult> SelectCompiler<TSource, TResult>(IEnumerable<TSource> source,
+
+    public static IEnumerable<TResult> SelectCompiler<TSource, TResult>(IEnumerable<TSource> source,
         Func<TSource, TResult> selector)
     {
         //Этот метод уже не итератором
@@ -75,7 +90,7 @@ public class Test
         }
     }
 
-    static IEnumerable<TResult> SelectManual<TSource, TResult>(IEnumerable<TSource> source,
+    public static IEnumerable<TResult> SelectManual<TSource, TResult>(IEnumerable<TSource> source,
         Func<TSource, TResult> selector)
     {
         //Этот метод уже не итератором
@@ -86,10 +101,13 @@ public class Test
     }
 
 
-    internal sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>
+    internal sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>, IEnumerator<TResult>
     {
+        public TResult Current { get; private set; } = default!;
         private readonly Func<TSource, TResult> _selector;
         private readonly IEnumerable<TSource> _source;
+        private IEnumerator<TSource> _enumerator;
+        private int _state = 1;
 
         public SelectManualEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
         {
@@ -99,7 +117,7 @@ public class Test
 
         public IEnumerator<TResult> GetEnumerator()
         {
-            return new Enumerator(_source, _selector);
+            return this;
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -107,69 +125,53 @@ public class Test
             return GetEnumerator();
         }
 
-        private sealed class Enumerator : IEnumerator<TResult>
+        public void Reset()
         {
-            private readonly Func<TSource, TResult> _selector;
-            private readonly IEnumerable<TSource> _source;
-            private IEnumerator<TSource> _enumerator;
-            private int _state = 1;
+            //99.99 % енумрайторов не имеют реализации, поэтому оставляем 
+            throw new NotSupportedException();
+        }
 
-            public Enumerator(IEnumerable<TSource> source, Func<TSource, TResult> selector)
+
+        //нас не дженерик не интресует, поэтому приравниваем к дженерик 
+        object? IEnumerator.Current => Current;
+
+        public void Dispose()
+        {
+            _state = -1;
+            _enumerator?.Dispose();
+            //пока не будем реализовывать
+        }
+
+        public bool MoveNext()
+        {
+            switch (_state)
             {
-                _source = source;
-                _selector = selector;
-            }
-
-
-            public void Reset()
-            {
-                //99.99 % енумрайторов не имеют реализации, поэтому оставляем 
-                throw new NotSupportedException();
-            }
-
-            public TResult Current { get; private set; } = default!;
-
-            //нас не дженерик не интресует, поэтому приравниваем к дженерик 
-            object? IEnumerator.Current => Current;
-
-            public void Dispose()
-            {
-                _state = -1;
-                _enumerator?.Dispose();
-                //пока не будем реализовывать
-            }
-
-            public bool MoveNext()
-            {
-                switch (_state)
-                {
-                    case 1:
-                        _enumerator = _source.GetEnumerator();
-                        _state = 2;
-                        goto case 2;
-                    case 2:
-                        try
+                case 1:
+                    _enumerator = _source.GetEnumerator();
+                    _state = 2;
+                    goto case 2;
+                case 2:
+                    try
+                    {
+                        if (_enumerator.MoveNext())
                         {
-                            if (_enumerator.MoveNext())
-                            {
-                                Current = _selector(_enumerator.Current);
-                                return true;
-                                //yield return _selector(enumerator.Current);
-                            }
+                            Current = _selector(_enumerator.Current);
+                            return true;
+                            //yield return _selector(enumerator.Current);
                         }
-                        catch
-                        {
-                            // _enumerator?.Dispose(); тут уже не нужен final
-                            Dispose();
-                            throw;
-                        }
+                    }
+                    catch
+                    {
+                        // _enumerator?.Dispose(); тут уже не нужен final
+                        Dispose();
+                        throw;
+                    }
 
-                        break;
-                }
-
-                Dispose();
-                return false;
+                    break;
             }
+
+            Dispose();
+            return false;
         }
     }
 }
