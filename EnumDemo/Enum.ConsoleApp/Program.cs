@@ -17,6 +17,10 @@ Console.WriteLine(Enumerable.Select(new Queue<int>(),i=>i));
 Console.WriteLine(Enumerable.Select(Enumerable.Range(1,1000),i=>i));
 
 
+Console.WriteLine(source.Select(i=>i%2).Select(i=>i));
+Console.WriteLine(source.Select(i=>i%2).Where(x=>x>1).Select(i=>i));
+
+
 // IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 // Console.WriteLine(source.Select(x => x * 2).Sum());
 // Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
