@@ -7,13 +7,13 @@ using BenchmarkDotNet.Running;
 //BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
 
- IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
- Console.WriteLine(source.Select(x => x * 2).Sum());
- Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
- Console.WriteLine(Test.SelectManual(source, x => x * 2).Sum());
+IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+Console.WriteLine(source.Select(x => x * 2).Sum());
+Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
+Console.WriteLine(Test.SelectManual(source, x => x * 2).Sum());
 
 // не реалзивали Reset %)
- var m = Test.SelectManual(source, x => x * 2);
+var m = Test.SelectManual(source, x => x * 2);
 
 Console.WriteLine(m.Sum());
 Console.WriteLine(m.Sum());
@@ -23,7 +23,6 @@ m = Test.SelectCompiler(source, x => x * 2);
 
 Console.WriteLine(m.Sum());
 Console.WriteLine(m.Sum());
-
 
 
 [MemoryDiagnoser]
@@ -107,7 +106,7 @@ public class Test
         private readonly Func<TSource, TResult> _selector;
         private readonly IEnumerable<TSource> _source;
         private IEnumerator<TSource> _enumerator;
-        private int _state = 1;
+        private int _state = 0;
 
         public SelectManualEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
         {
@@ -117,7 +116,13 @@ public class Test
 
         public IEnumerator<TResult> GetEnumerator()
         {
-            return this;
+            if (_state == 0)
+            {
+                _state = 1;
+                return this;
+            }
+
+            return new SelectManualEnumerable<TSource, TResult>(_source, _selector) { _state = 1 };
         }
 
         IEnumerator IEnumerable.GetEnumerator()
