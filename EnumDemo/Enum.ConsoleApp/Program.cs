@@ -4,8 +4,13 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 
 
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 
+
+Console.WriteLine(Test.SelectCompiler(source,i=>i));
+Console.WriteLine(Test.SelectManual(source,i=>i));
+Console.WriteLine(Enumerable.Select(source,i=>i));
 
 // IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
 // Console.WriteLine(source.Select(x => x * 2).Sum());
