@@ -107,6 +107,8 @@ public class Test
         private readonly IEnumerable<TSource> _source;
         private IEnumerator<TSource> _enumerator;
         private int _state = 0;
+        private int _threadId = Environment.CurrentManagedThreadId;
+        
 
         public SelectManualEnumerable(IEnumerable<TSource> source, Func<TSource, TResult> selector)
         {
@@ -116,7 +118,11 @@ public class Test
 
         public IEnumerator<TResult> GetEnumerator()
         {
-            if (_state == 0)
+            // тут проблема с дотсупом с нескольких ыпотоков к переменной. Два потока могут начать обрабатывать один и тот же итератор одновременно 
+            //  и обоих может быть  state = 1.
+            // sпервое решение такое
+            //if(Interlocked.CompareExchange(ref _state,1,0)==0)
+            if (_threadId==Environment.CurrentManagedThreadId && _state == 0) // подобную проверку генерит сам компилятор
             {
                 _state = 1;
                 return this;
