@@ -4,25 +4,25 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 
 
-//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
 
-IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
-Console.WriteLine(source.Select(x => x * 2).Sum());
-Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
-Console.WriteLine(Test.SelectManual(source, x => x * 2).Sum());
-
-// не реалзивали Reset %)
-var m = Test.SelectManual(source, x => x * 2);
-
-Console.WriteLine(m.Sum());
-Console.WriteLine(m.Sum());
-
-
-m = Test.SelectCompiler(source, x => x * 2);
-
-Console.WriteLine(m.Sum());
-Console.WriteLine(m.Sum());
+// IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+// Console.WriteLine(source.Select(x => x * 2).Sum());
+// Console.WriteLine(Test.SelectCompiler(source, x => x * 2).Sum());
+// Console.WriteLine(Test.SelectManual(source, x => x * 2).Sum());
+//
+// // не реалзивали Reset %)
+// var m = Test.SelectManual(source, x => x * 2);
+//
+// Console.WriteLine(m.Sum());
+// Console.WriteLine(m.Sum());
+//
+//
+// m = Test.SelectCompiler(source, x => x * 2);
+//
+// Console.WriteLine(m.Sum());
+// Console.WriteLine(m.Sum());
 
 
 [MemoryDiagnoser]
