@@ -145,7 +145,7 @@ public class Test
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        
+
         if (source is TSource[] sourceArray)
         {
             return new SelectManualArray<TSource, TResult>(sourceArray, selector);
@@ -162,8 +162,6 @@ public class Test
         private readonly TSource[] _source;
         private int _state = 0;
         private int _threadId = Environment.CurrentManagedThreadId;
-        private int _i;
-
 
         public SelectManualArray(TSource[] source, Func<TSource, TResult> selector)
         {
@@ -210,31 +208,34 @@ public class Test
 
         public bool MoveNext()
         {
-            switch (_state)
+            int i = _state - 1;
+
+            /*
+            Уменьшение доступа к полю класса:
+
+            Каждый раз, когда вы обращаетесь к полю _source внутри метода, это потенциально может привести к дополнительным накладным расходам, связанным с доступом к полям экземпляра класса. Поля экземпляра хранятся в куче, и к ним доступ может быть медленнее, чем к локальным переменным, которые располагаются в стеке.
+                Когда вы сохраняете поле в локальную переменную source, эта переменная находится в стеке и доступ к ней быстрее.
+                Оптимизация работы JIT-компилятора:
+
+            В некоторых случаях JIT-компилятор может оптимизировать доступ к локальной переменной лучше, чем к полю. Особенно, если доступ к полю происходит несколько раз в одном методе.
+                Компиляторы, такие как JIT, могут избежать необходимости обращаться к памяти, если значение хранится в регистре процессора, что снижает накладные расходы на доступ.
+            */
+            
+            TSource[] source = _source;
+            
+            // что бы избежать дополнительно проверки что индекс отрицательный
+            //if (i >= 0 && i < source.Length)
+            /*В этой конструкции проверка на отрицательность числа происходит автоматически, так как uint (беззнаковый тип) не может быть отрицательным. Если переменная i отрицательна, её значение будет интерпретировано как большое положительное число, и сравнение всегда даст ложный результат (то есть условие будет ложным).
+                Это позволяет избежать явной проверки на отрицательные значения, что может ускорить выполнение кода, поскольку лишняя инструкция становится ненужной.
+                Одно сравнение вместо двух:
+
+            В стандартной проверке с отрицательными значениями вам нужно выполнять два условия: проверку на отрицательность и проверку на диапазон:*/
+            if ((uint)i < (uint)source.Length)
             {
-                case 1:
-
-                    _state = 2;
-                    goto case 2;
-                case 2:
-                    try
-                    {
-                        if (_i < _source.Length)
-                        {
-                            Current = _selector(_source[_i]);
-                            _i++;
-                            return true;
-                            //yield return _selector(enumerator.Current);
-                        }
-                    }
-                    catch
-                    {
-                        // _enumerator?.Dispose(); тут уже не нужен final
-                        Dispose();
-                        throw;
-                    }
-
-                    break;
+                _state++;
+                Current = _selector(_source[i]);
+                return true;
+                //yield return _selector(enumerator.Current);
             }
 
             Dispose();
