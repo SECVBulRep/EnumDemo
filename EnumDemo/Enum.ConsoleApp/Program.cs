@@ -4,8 +4,11 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 
 
-BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
-//IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+//BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
+IEnumerable<int> source = Enumerable.Range(0, 1000).ToArray();
+Console.WriteLine(Enumerable.Select(Enumerable.Where(source,i => i % 2 == 0),   i => i*2).Sum());
+Console.WriteLine(Test.SelectCompiler(Test.WhereCompiler(source,i => i % 2 == 0),   i => i*2).Sum());
+Console.WriteLine(Test.SelectManual(Test.WhereManual(source,i => i % 2 == 0),   i => i*2).Sum());
 
 
 // Console.WriteLine(Test.SelectCompiler(source, i => i));
@@ -95,12 +98,6 @@ public class Test
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-        if (source is TSource[] sourceArray)
-        {
-            return ArrayImpl(sourceArray, selector);
-        }
-
-
         return Impl(source, selector);
 
         //а вот этот уже итератор
@@ -108,35 +105,24 @@ public class Test
         {
             foreach (var i in source) yield return selector(i);
         }
-
-        static IEnumerable<TResult> ArrayImpl<TSource, TResult>(TSource[] source, Func<TSource, TResult> selector)
-        {
-            //foreach (var i in source) yield return selector(i);
-            for (int i = 0; i < source.Length; i++)
-            {
-                yield return selector(source[i]);
-            }
-        }
-
-
-        /*
-         * вставь  в sharplab и покажи разницу
-         *public class C<TSource,TResult>
-{
-    static IEnumerable<TResult> Impl<TSource, TResult>(IEnumerable<TSource> source, Func<TSource, TResult> selector)
-        {
-            foreach (var i in source) yield return selector(i);
-        }
-
-        static IEnumerable<TResult> ArrayImpl<TSource, TResult>(TSource[] source, Func<TSource, TResult> selector)
-        {
-            foreach (var i in source) yield return selector(i);
-        }
-}
-         *
-         *
-         */
     }
+
+
+    public static IEnumerable<TSource> WhereCompiler<TSource>(IEnumerable<TSource> source, Func<TSource, bool> filter)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(filter);
+
+        return Impl(source, filter);
+       
+        static IEnumerable<TSource> Impl(IEnumerable<TSource> source, Func<TSource, bool> filter)
+        {
+            foreach (var i in source)
+                if (filter(i))
+                    yield return i;
+        }
+    }
+
 
     public static IEnumerable<TResult> SelectManual<TSource, TResult>(IEnumerable<TSource> source,
         Func<TSource, TResult> selector)
@@ -145,104 +131,20 @@ public class Test
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(selector);
 
-
-        if (source is TSource[] sourceArray)
-        {
-            return new SelectManualArray<TSource, TResult>(sourceArray, selector);
-        }
-
         return new SelectManualEnumerable<TSource, TResult>(source, selector);
     }
-
-
-    internal sealed class SelectManualArray<TSource, TResult> : IEnumerable<TResult>, IEnumerator<TResult>
+    
+    public static IEnumerable<TSource> WhereManual<TSource>(IEnumerable<TSource> source,
+        Func<TSource, bool> filter)
     {
-        public TResult Current { get; private set; } = default!;
-        private readonly Func<TSource, TResult> _selector;
-        private readonly TSource[] _source;
-        private int _state = 0;
-        private int _threadId = Environment.CurrentManagedThreadId;
+        //Этот метод уже не итератором
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(filter);
 
-        public SelectManualArray(TSource[] source, Func<TSource, TResult> selector)
-        {
-            _source = source;
-            _selector = selector;
-        }
-
-        public IEnumerator<TResult> GetEnumerator()
-        {
-            // тут проблема с дотсупом с нескольких ыпотоков к переменной. Два потока могут начать обрабатывать один и тот же итератор одновременно 
-            //  и обоих может быть  state = 1.
-            // sпервое решение такое
-            //if(Interlocked.CompareExchange(ref _state,1,0)==0)
-            if (_threadId == Environment.CurrentManagedThreadId &&
-                _state == 0) // подобную проверку генерит сам компилятор
-            {
-                _state = 1;
-                return this;
-            }
-
-            return new SelectManualArray<TSource, TResult>(_source, _selector) { _state = 1 };
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public void Reset()
-        {
-            //99.99 % енумрайторов не имеют реализации, поэтому оставляем 
-            throw new NotSupportedException();
-        }
-
-
-        //нас не дженерик не интресует, поэтому приравниваем к дженерик 
-        object? IEnumerator.Current => Current;
-
-        public void Dispose()
-        {
-            _state = -1;
-            //пока не будем реализовывать
-        }
-
-        public bool MoveNext()
-        {
-            int i = _state - 1;
-
-            /*
-            Уменьшение доступа к полю класса:
-
-            Каждый раз, когда вы обращаетесь к полю _source внутри метода, это потенциально может привести к дополнительным накладным расходам, связанным с доступом к полям экземпляра класса. Поля экземпляра хранятся в куче, и к ним доступ может быть медленнее, чем к локальным переменным, которые располагаются в стеке.
-                Когда вы сохраняете поле в локальную переменную source, эта переменная находится в стеке и доступ к ней быстрее.
-                Оптимизация работы JIT-компилятора:
-
-            В некоторых случаях JIT-компилятор может оптимизировать доступ к локальной переменной лучше, чем к полю. Особенно, если доступ к полю происходит несколько раз в одном методе.
-                Компиляторы, такие как JIT, могут избежать необходимости обращаться к памяти, если значение хранится в регистре процессора, что снижает накладные расходы на доступ.
-            */
-            
-            TSource[] source = _source;
-            
-            // что бы избежать дополнительно проверки что индекс отрицательный
-            //if (i >= 0 && i < source.Length)
-            /*В этой конструкции проверка на отрицательность числа происходит автоматически, так как uint (беззнаковый тип) не может быть отрицательным. Если переменная i отрицательна, её значение будет интерпретировано как большое положительное число, и сравнение всегда даст ложный результат (то есть условие будет ложным).
-                Это позволяет избежать явной проверки на отрицательные значения, что может ускорить выполнение кода, поскольку лишняя инструкция становится ненужной.
-                Одно сравнение вместо двух:
-
-            В стандартной проверке с отрицательными значениями вам нужно выполнять два условия: проверку на отрицательность и проверку на диапазон:*/
-            if ((uint)i < (uint)source.Length)
-            {
-                _state++;
-                Current = _selector(_source[i]);
-                return true;
-                //yield return _selector(enumerator.Current);
-            }
-
-            Dispose();
-            return false;
-        }
+        return new WhereManualEnumerable<TSource>(source, filter);
     }
-
+    
+    
     internal sealed class SelectManualEnumerable<TSource, TResult> : IEnumerable<TResult>, IEnumerator<TResult>
     {
         public TResult Current { get; private set; } = default!;
@@ -312,6 +214,99 @@ public class Test
                         {
                             Current = _selector(_enumerator.Current);
                             return true;
+                            //yield return _selector(enumerator.Current);
+                        }
+                    }
+                    catch
+                    {
+                        // _enumerator?.Dispose(); тут уже не нужен final
+                        Dispose();
+                        throw;
+                    }
+
+                    break;
+            }
+
+            Dispose();
+            return false;
+        }
+    }
+    
+    internal sealed class WhereManualEnumerable<TSource> : IEnumerable<TSource>, IEnumerator<TSource>
+    {
+        public TSource Current { get; private set; } = default!;
+        private readonly Func<TSource, bool> _filter;
+        private readonly IEnumerable<TSource> _source;
+        private IEnumerator<TSource> _enumerator;
+        private int _state = 0;
+        private int _threadId = Environment.CurrentManagedThreadId;
+
+
+        public WhereManualEnumerable(IEnumerable<TSource> source, Func<TSource, bool> filter)
+        {
+            _source = source;
+            _filter = filter;
+        }
+
+        public IEnumerator<TSource> GetEnumerator()
+        {
+            // тут проблема с дотсупом с нескольких ыпотоков к переменной. Два потока могут начать обрабатывать один и тот же итератор одновременно 
+            //  и обоих может быть  state = 1.
+            // sпервое решение такое
+            //if(Interlocked.CompareExchange(ref _state,1,0)==0)
+            if (_threadId == Environment.CurrentManagedThreadId &&
+                _state == 0) // подобную проверку генерит сам компилятор
+            {
+                _state = 1;
+                return this;
+            }
+
+            return new WhereManualEnumerable<TSource>(_source, _filter) { _state = 1 };
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public void Reset()
+        {
+            //99.99 % енумрайторов не имеют реализации, поэтому оставляем 
+            throw new NotSupportedException();
+        }
+
+
+        //нас не дженерик не интресует, поэтому приравниваем к дженерик 
+        object? IEnumerator.Current => Current;
+
+        public void Dispose()
+        {
+            _state = -1;
+            _enumerator?.Dispose();
+            //пока не будем реализовывать
+        }
+
+        public bool MoveNext()
+        {
+            switch (_state)
+            {
+                case 1:
+                    _enumerator = _source.GetEnumerator();
+                    _state = 2;
+                    goto case 2;
+                case 2:
+                    try
+                    {
+                        // тут нет итерации из вне. Нам нужно все сразу
+                        while (_enumerator.MoveNext())
+                        {
+                            // оптимизация
+                            TSource current = _enumerator.Current;
+                            if (_filter(current))
+                            { 
+                                Current = current;
+                                return true;
+                            }
                             //yield return _selector(enumerator.Current);
                         }
                     }
